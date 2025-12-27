@@ -1,3 +1,13 @@
+# Ignore Virtual Env
 .venv/
-.venv/
-.venv/
+venv/
+__pycache__/
+
+# Ignore Large Models & Data
+models/*.gguf
+knowledge_base/faiss_index.bin
+knowledge_base/doc_chunks.txt
+
+# Ignore IDE settings
+.vscode/
+.idea/
