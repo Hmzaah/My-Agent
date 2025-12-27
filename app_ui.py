@@ -4,7 +4,6 @@ import sys
 import time
 from llama_cpp import Llama
 
-# Add app folder to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
 from agents.planner import Planner
@@ -15,175 +14,141 @@ from agents.critic import Critic
 from agents.synthesizer import Synthesizer
 from agents.web_searcher import WebSearcher
 
-# --- Jolt Configuration ---
-st.set_page_config(
-    page_title="Jolt | AI Assistant", 
-    page_icon="⚡", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- CONFIG ---
+st.set_page_config(page_title="Jolt | Deep Thinking", page_icon="⚡", layout="wide")
+st.markdown("<style>.stChatInput {border-radius: 20px;} h1 {color: #FF4B4B;}</style>", unsafe_allow_html=True)
 
-# Custom CSS for "Jolt" aesthetic
-st.markdown("""
-<style>
-    .stChatInput {border-radius: 20px;}
-    .reportview-container {background: #0e1117;}
-    h1 {color: #FF4B4B;}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Sidebar: Control Center ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("⚡ Jolt")
-    st.caption("v1.0.0 | Local Research Engine")
-    
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("GPU", "On", delta_color="normal")
-    with col2:
-        st.metric("Net", "Active", delta_color="normal")
-        
-    st.markdown("---")
-    
-    if st.button("🧹 New Chat", use_container_width=True):
+    st.caption("Mode: Best Effort (Robust)")
+    if st.button("🧹 Reset", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-    
-    if st.button("🧠 Rebuild Memory", use_container_width=True):
-        with st.status("Indexing...", expanded=True) as status:
-            os.system("python build_faiss_index.py")
-            status.update(label="Memory Updated!", state="complete")
-            time.sleep(1)
-            st.rerun()
-            
-    st.markdown("---")
-    st.code("Model: Phi-3 Mini\nVRAM: 4GB Limit\nMode: Auto-Learning", language="yaml")
+    st.code("Model: Qwen 2.5 (3B)\nLogic: Persist Context", language="yaml")
 
-# --- Initialization ---
+# --- INIT ---
 @st.cache_resource
-def initialize_system():
-    if not os.path.exists("knowledge_base"):
-        os.makedirs("knowledge_base")
-        
-    chunk_path = os.path.join("knowledge_base", "doc_chunks.txt")
+def init_brain():
+    if not os.path.exists("knowledge_base"): os.makedirs("knowledge_base")
+    chunk_path = "knowledge_base/doc_chunks.txt"
     chunks = []
     if os.path.exists(chunk_path):
         with open(chunk_path, "r", encoding="utf-8") as f:
             chunks = f.read().split("\n")
     
-    # Load Engine (GPU Mode)
-    llm_engine = Llama(
-        model_path="models/phi-3-mini-4k.gguf",
-        n_ctx=4096,
+    # LOAD MODEL
+    llm = Llama(
+        model_path="models/qwen2.5-3b.gguf",
+        n_ctx=2048,
         n_gpu_layers=-1, 
         verbose=False
     )
     
     return {
-        "planner": Planner(llm_engine),
-        "synthesizer": Synthesizer(llm_engine),
-        "distiller": Distiller(llm_engine),
-        "critic": Critic(llm_engine),
+        "planner": Planner(llm),
         "retriever": Retriever("faiss_index.bin", chunks, "sentence-transformers/all-MiniLM-L6-v2") if chunks else None,
         "reranker": Reranker(),
-        "web_searcher": WebSearcher()
+        "distiller": Distiller(llm),
+        "critic": Critic(llm),
+        "web": WebSearcher(),
+        "synth": Synthesizer(llm)
     }
 
 if "agents" not in st.session_state:
-    with st.spinner("⚡ Jolt is powering up..."):
-        st.session_state.agents = initialize_system()
-
+    st.session_state.agents = init_brain()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- Main Chat Interface ---
+# --- CHAT ---
 st.title("⚡ Jolt")
 
 for msg in st.session_state.messages:
-    avatar = "⚡" if msg["role"] == "assistant" else "👤"
-    with st.chat_message(msg["role"], avatar=avatar):
+    with st.chat_message(msg["role"], avatar="⚡" if msg["role"] == "assistant" else "👤"):
         st.markdown(msg["content"])
-        if "context" in msg and msg["context"]:
-            with st.expander("🔎 Inspect Knowledge Source"):
-                st.info(msg["source_type"])
-                st.code(msg["context"], language="text")
+        if "trace" in msg and msg["trace"]:
+            with st.expander("🧠 View Thinking Process"):
+                st.code(msg["trace"])
 
-if prompt := st.chat_input("What do you want to know?"):
+if prompt := st.chat_input("Ask me anything..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    if st.session_state.agents:
-        with st.chat_message("assistant", avatar="⚡"):
-            msg_ph = st.empty()
+    with st.chat_message("assistant", avatar="⚡"):
+        msg_ph = st.empty()
+        full_trace = ""
+        
+        with st.status("⚡ Thinking...", expanded=True) as status:
             
-            with st.status("⚡ Jolt is thinking...", expanded=True) as status:
+            # --- THE LOOP ---
+            final_context = "" # Will hold the BEST context found so far
+            current_plan = ""
+            feedback = None
+            max_attempts = 2
+            attempt = 0
+            
+            while attempt < max_attempts:
+                attempt += 1
+                status.write(f"🔄 **Cycle {attempt}: Planning...**")
                 
-                # 1. Plan
-                chat_history = [(m["content"], "") for m in st.session_state.messages if m["role"] == "user"]
-                plan = st.session_state.agents["planner"].generate_plan(prompt, chat_history)
-                status.write(f"📋 **Plan:** {plan}")
+                # 1. PLAN
+                current_plan = st.session_state.agents["planner"].generate_plan(prompt, [], feedback)
+                full_trace += f"\n[Plan {attempt}]: {current_plan}\n"
                 
-                # 2. Check Local
-                final_context = ""
-                source_lbl = "Local Memory"
+                # 2. ACTION
+                context_found = ""
+                source = "Web" # Default to Web
                 
-                if st.session_state.agents["retriever"]:
-                    status.write("📂 Checking archives...")
-                    retrieved = st.session_state.agents["retriever"].retrieve(prompt)
-                    ranked = st.session_state.agents["reranker"].rerank(prompt, retrieved)
-                    distilled = st.session_state.agents["distiller"].distill(ranked)
-                    valid, _ = st.session_state.agents["critic"].evaluate_sufficiency(plan, distilled)
-                    
-                    if valid:
-                        status.write("✅ Found locally.")
-                        final_context = distilled
-                
-                # 3. Check Web (if needed)
-                if not final_context:
-                    status.write("🌐 Browsing live web...")
-                    web_context = st.session_state.agents["web_searcher"].search(prompt)
-                    
-                    if web_context:
-                        status.write("✅ Found on web.")
-                        final_context = web_context
-                        source_lbl = "Web Search (New Learning)"
-                        st.session_state.agents["web_searcher"].save_knowledge(prompt, web_context)
-                    else:
-                        status.write("❌ No data found.")
-                
-                status.update(label="Ready", state="complete", expanded=False)
+                # Try Local (Attempt 1 only)
+                if attempt == 1 and st.session_state.agents["retriever"]:
+                    status.write("📂 Checking Memory...")
+                    raw = st.session_state.agents["retriever"].retrieve(prompt)
+                    if raw:
+                        ranked = st.session_state.agents["reranker"].rerank(prompt, raw)
+                        distilled = st.session_state.agents["distiller"].distill(ranked)
+                        if len(distilled) > 50:
+                            context_found = distilled
+                            source = "Local"
+                # Try Web (If Local failed or Attempt > 1)
+                if not context_found:
+                    status.write("🌐 Searching Web...")
+                    source = "Web"
+                    # SEARCH FIX: Only search the PROMPT, not the PLAN
+                    context_found = st.session_state.agents["web"].search(prompt)
+                    if context_found:
+                        st.session_state.agents["web"].save_knowledge(prompt, context_found)
 
-            # 4. Generate
-            response = st.session_state.agents["synthesizer"].generate_response(
-                query=prompt,
-                plan=plan,
-                context=final_context,
-                critique="Strict Fact Check"
-            )
+                # --- CRITICAL FIX: ALWAYS SAVE CONTEXT ---
+                if context_found:
+                    final_context = context_found 
+
+                # 3. CRITIQUE
+                status.write("⚖️ Critiquing Evidence...")
+                valid, critique = st.session_state.agents["critic"].evaluate_sufficiency(current_plan, context_found)
+                
+                if valid:
+                    status.write("✅ Evidence is sufficient!")
+                    break # Success!
+                else:
+                    status.write(f"❌ Rejection: {critique}")
+                    feedback = critique 
+                    full_trace += f"[Critique {attempt}]: Failed - {critique}\n"
             
-            # Typing Animation
-            full_res = ""
-            for chunk in response.split():
-                full_res += chunk + " "
-                msg_ph.markdown(full_res + "▌")
-                time.sleep(0.01)
-            msg_ph.markdown(full_res)
+            status.update(label="Thinking Complete", state="complete")
             
-            # Context Footer
+            # 4. SYNTHESIZE (Best Effort)
+            response = st.session_state.agents["synth"].generate_response(prompt, current_plan, final_context, "Final Attempt")
+            
+            msg_ph.markdown(response)
+            
             if final_context:
-                with st.expander("🔎 Inspect Knowledge Source"):
-                    st.info(f"Source: {source_lbl}")
-                    st.code(final_context, language="text")
-            
-            if source_lbl == "Web Search (New Learning)":
-                st.toast("Jolt learned something new.", icon="💾")
+                with st.expander("🔎 Source Data Used"):
+                    st.info(f"Source: {source} (Best Available)")
+                    st.code(final_context[:1000] + "...")
 
         st.session_state.messages.append({
             "role": "assistant", 
-            "content": full_res,
-            "context": final_context,
-            "source_type": source_lbl
+            "content": response,
+            "trace": full_trace
         })
