@@ -1,13 +1,19 @@
-# Ignore Virtual Env
+# Ignore Agent Memory (Personal Data)
+knowledge_base/
+knowledge_base/*.txt
+
+# Ignore Large AI Models
+models/
+*.gguf
+
+# Ignore Virtual Environment
 .venv/
-venv/
 __pycache__/
 
-# Ignore Large Models & Data
-models/*.gguf
-knowledge_base/faiss_index.bin
-knowledge_base/doc_chunks.txt
-
-# Ignore IDE settings
-.vscode/
-.idea/
+# Ignore Temporary Install Scripts
+fix_*.py
+write_*.py
+patch_*.py
+tune_*.py
+upgrade_*.py
+unlock_*.py
