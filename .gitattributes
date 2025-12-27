@@ -1,0 +1,3 @@
+models/* filter=lfs diff=lfs merge=lfs -text
+knowledge_base/faiss_index/* filter=lfs diff=lfs merge=lfs -text
+faiss_index.bin filter=lfs diff=lfs merge=lfs -text
