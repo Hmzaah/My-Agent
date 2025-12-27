@@ -13,47 +13,71 @@ from agents.reranker import Reranker
 from agents.distiller import Distiller
 from agents.critic import Critic
 from agents.synthesizer import Synthesizer
+from agents.web_searcher import WebSearcher
 
-# --- Page Config ---
+# --- Jolt Configuration ---
 st.set_page_config(
-    page_title="Deep Thinking Agent (GPU)", 
-    page_icon="🚀", 
-    layout="wide"
+    page_title="Jolt | AI Assistant", 
+    page_icon="⚡", 
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# --- Sidebar Control Center ---
+# Custom CSS for "Jolt" aesthetic
+st.markdown("""
+<style>
+    .stChatInput {border-radius: 20px;}
+    .reportview-container {background: #0e1117;}
+    h1 {color: #FF4B4B;}
+</style>
+""", unsafe_allow_html=True)
+
+# --- Sidebar: Control Center ---
 with st.sidebar:
-    st.title("🚀 Deep Thinking Agent")
-    st.markdown("---")
-    st.markdown("**System Status:**")
-    st.success("🟢 AI Model Loaded (Phi-3)")
-    st.success("🟢 GPU Acceleration: ON")
-    st.success("🟢 Vector DB Active")
+    st.header("⚡ Jolt")
+    st.caption("v1.0.0 | Local Research Engine")
     
     st.markdown("---")
-    if st.button("🗑️ Clear Conversation", type="primary"):
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("GPU", "On", delta_color="normal")
+    with col2:
+        st.metric("Net", "Active", delta_color="normal")
+        
+    st.markdown("---")
+    
+    if st.button("🧹 New Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-        
+    
+    if st.button("🧠 Rebuild Memory", use_container_width=True):
+        with st.status("Indexing...", expanded=True) as status:
+            os.system("python build_faiss_index.py")
+            status.update(label="Memory Updated!", state="complete")
+            time.sleep(1)
+            st.rerun()
+            
     st.markdown("---")
-    st.caption("Architecture: Agentic RAG\nModel: Phi-3 Mini 4K\nHardware: RTX 3050 (Turbo)")
+    st.code("Model: Phi-3 Mini\nVRAM: 4GB Limit\nMode: Auto-Learning", language="yaml")
 
-# --- Initialization (Cached) ---
+# --- Initialization ---
 @st.cache_resource
 def initialize_system():
-    chunk_path = os.path.join("knowledge_base", "doc_chunks.txt")
-    if not os.path.exists(chunk_path):
-        st.error("❌ Knowledge base not found! Run build_faiss_index.py first.")
-        return None
+    if not os.path.exists("knowledge_base"):
+        os.makedirs("knowledge_base")
         
-    with open(chunk_path, "r", encoding="utf-8") as f:
-        chunks = f.read().split("\n")
+    chunk_path = os.path.join("knowledge_base", "doc_chunks.txt")
+    chunks = []
+    if os.path.exists(chunk_path):
+        with open(chunk_path, "r", encoding="utf-8") as f:
+            chunks = f.read().split("\n")
     
-    # LOAD MODEL ON GPU (n_gpu_layers=-1 means "All layers to VRAM")
+    # Load Engine (GPU Mode)
     llm_engine = Llama(
         model_path="models/phi-3-mini-4k.gguf",
         n_ctx=4096,
-        n_gpu_layers=-1,  # <--- THE TURBO SWITCH
+        n_gpu_layers=-1, 
         verbose=False
     )
     
@@ -62,108 +86,104 @@ def initialize_system():
         "synthesizer": Synthesizer(llm_engine),
         "distiller": Distiller(llm_engine),
         "critic": Critic(llm_engine),
-        "retriever": Retriever("faiss_index.bin", chunks, "sentence-transformers/all-MiniLM-L6-v2"),
-        "reranker": Reranker()
+        "retriever": Retriever("faiss_index.bin", chunks, "sentence-transformers/all-MiniLM-L6-v2") if chunks else None,
+        "reranker": Reranker(),
+        "web_searcher": WebSearcher()
     }
 
 if "agents" not in st.session_state:
-    with st.spinner("🚀 Revving up the RTX 3050... (Loading Model)"):
+    with st.spinner("⚡ Jolt is powering up..."):
         st.session_state.agents = initialize_system()
 
-# --- Session State ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- Render Chat History ---
-st.header("💬 Agentic Chat Interface (GPU Accelerated)")
+# --- Main Chat Interface ---
+st.title("⚡ Jolt")
 
 for msg in st.session_state.messages:
-    avatar = "👤" if msg["role"] == "user" else "🤖"
+    avatar = "⚡" if msg["role"] == "assistant" else "👤"
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
         if "context" in msg and msg["context"]:
-            with st.expander("🕵️ View Source Documents"):
+            with st.expander("🔎 Inspect Knowledge Source"):
+                st.info(msg["source_type"])
                 st.code(msg["context"], language="text")
 
-# --- Main Interaction Loop ---
-if prompt := st.chat_input("Ask me anything..."):
-    # 1. User Message
+if prompt := st.chat_input("What do you want to know?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    # 2. AI Processing
     if st.session_state.agents:
-        with st.chat_message("assistant", avatar="🤖"):
-            message_placeholder = st.empty()
-            status = st.status("🧠 **Deep Thinking in progress...**", expanded=True)
+        with st.chat_message("assistant", avatar="⚡"):
+            msg_ph = st.empty()
             
-            # Prepare history
-            chat_history_tuples = [(m["content"], "") for m in st.session_state.messages if m["role"] == "user"]
-            
-            # A. PLAN
-            status.write("🤔 **Planner:** Strategizing...")
-            plan = st.session_state.agents["planner"].generate_plan(prompt, chat_history_tuples)
-            status.write(f"📋 **Plan:** {plan}")
-            
-            # B. EXECUTE LOOP
-            final_context = ""
-            critique_feedback = ""
-            current_query = prompt
-            max_retries = 2
-            
-            for attempt in range(max_retries + 1):
-                status.write(f"🔍 **Cycle {attempt+1}:** Searching knowledge base...")
+            with st.status("⚡ Jolt is thinking...", expanded=True) as status:
                 
-                # Retrieve & Rerank
-                retrieved_docs = st.session_state.agents["retriever"].retrieve(current_query, top_k=5)
-                ranked_docs = st.session_state.agents["reranker"].rerank(current_query, retrieved_docs)
-                distilled_context = st.session_state.agents["distiller"].distill(ranked_docs)
+                # 1. Plan
+                chat_history = [(m["content"], "") for m in st.session_state.messages if m["role"] == "user"]
+                plan = st.session_state.agents["planner"].generate_plan(prompt, chat_history)
+                status.write(f"📋 **Plan:** {plan}")
                 
-                # Critic
-                status.write("⚖️ **Critic:** Verifying facts...")
-                is_sufficient, feedback = st.session_state.agents["critic"].evaluate_sufficiency(plan, distilled_context)
+                # 2. Check Local
+                final_context = ""
+                source_lbl = "Local Memory"
                 
-                if is_sufficient:
-                    status.write(f"✅ **Verified:** Found sufficient data.")
-                    final_context = distilled_context
-                    critique_feedback = "Verified."
-                    break
-                else:
-                    status.write(f"❌ **Refining:** {feedback}")
-                    if attempt < max_retries:
-                        current_query = f"{prompt} {feedback}"
+                if st.session_state.agents["retriever"]:
+                    status.write("📂 Checking archives...")
+                    retrieved = st.session_state.agents["retriever"].retrieve(prompt)
+                    ranked = st.session_state.agents["reranker"].rerank(prompt, retrieved)
+                    distilled = st.session_state.agents["distiller"].distill(ranked)
+                    valid, _ = st.session_state.agents["critic"].evaluate_sufficiency(plan, distilled)
+                    
+                    if valid:
+                        status.write("✅ Found locally.")
+                        final_context = distilled
+                
+                # 3. Check Web (if needed)
+                if not final_context:
+                    status.write("🌐 Browsing live web...")
+                    web_context = st.session_state.agents["web_searcher"].search(prompt)
+                    
+                    if web_context:
+                        status.write("✅ Found on web.")
+                        final_context = web_context
+                        source_lbl = "Web Search (New Learning)"
+                        st.session_state.agents["web_searcher"].save_knowledge(prompt, web_context)
                     else:
-                        status.write("⚠️ **Limit:** Proceeding with best available info.")
-                        final_context = distilled_context
-                        critique_feedback = f"Insufficient: {feedback}"
-            
-            status.update(label="✅ Thinking Complete", state="complete", expanded=False)
-            
-            # C. SYNTHESIZE
+                        status.write("❌ No data found.")
+                
+                status.update(label="Ready", state="complete", expanded=False)
+
+            # 4. Generate
             response = st.session_state.agents["synthesizer"].generate_response(
                 query=prompt,
                 plan=plan,
                 context=final_context,
-                critique=critique_feedback
+                critique="Strict Fact Check"
             )
             
-            # Typewriter effect
-            full_response = ""
+            # Typing Animation
+            full_res = ""
             for chunk in response.split():
-                full_response += chunk + " "
-                message_placeholder.markdown(full_response + "▌")
-                time.sleep(0.01) # Faster typing speed for GPU
-            message_placeholder.markdown(full_response)
+                full_res += chunk + " "
+                msg_ph.markdown(full_res + "▌")
+                time.sleep(0.01)
+            msg_ph.markdown(full_res)
             
-            # Show Sources
+            # Context Footer
             if final_context:
-                with st.expander("🕵️ View Source Documents"):
+                with st.expander("🔎 Inspect Knowledge Source"):
+                    st.info(f"Source: {source_lbl}")
                     st.code(final_context, language="text")
             
-        # 3. Save AI Message
+            if source_lbl == "Web Search (New Learning)":
+                st.toast("Jolt learned something new.", icon="💾")
+
         st.session_state.messages.append({
             "role": "assistant", 
-            "content": full_response,
-            "context": final_context
+            "content": full_res,
+            "context": final_context,
+            "source_type": source_lbl
         })
