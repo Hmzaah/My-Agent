@@ -84,6 +84,7 @@ class OpenAICompatibleLLM:
             base_url=settings.openai_base_url,
             api_key=settings.openai_api_key.get_secret_value(),
             timeout=settings.llm_timeout_s,
+            max_retries=6,  # hosted free tiers rate-limit; the SDK backs off on 429s
         )
         self._model = settings.llm_model
         self._temperature = settings.llm_temperature
