@@ -1,0 +1,22 @@
+{"id": "ofdm-cp", "question": "Why does OFDM add a cyclic prefix to each symbol?", "expected_sources": ["ofdm_basics.md"], "answer_keywords": ["delay spread", "inter-symbol interference"]}
+{"id": "ofdm-equalizer", "question": "What kind of equalizer does an OFDM receiver need per subcarrier?", "expected_sources": ["ofdm_basics.md"], "answer_keywords": ["one-tap"]}
+{"id": "ofdm-papr", "question": "Which power amplifier problem is caused by OFDM signals?", "expected_sources": ["ofdm_basics.md"], "answer_keywords": ["peak-to-average power ratio"]}
+{"id": "ofdm-5g", "question": "Which waveform does 5G New Radio use?", "expected_sources": ["ofdm_basics.md"], "answer_keywords": ["cp-ofdm"]}
+{"id": "isac-range", "question": "What is the range resolution of an OFDM radar with 1 GHz of bandwidth?", "expected_sources": ["isac.md"], "answer_keywords": ["15 cm"]}
+{"id": "isac-velocity", "question": "How does an OFDM ISAC system estimate the velocity of a target?", "expected_sources": ["isac.md"], "answer_keywords": ["doppler"]}
+{"id": "isac-standard", "question": "Which IEEE task group is standardising WLAN sensing?", "expected_sources": ["isac.md"], "answer_keywords": ["802.11bf"]}
+{"id": "thz-band", "question": "What frequency range is usually called the terahertz band?", "expected_sources": ["terahertz_communication.md"], "answer_keywords": ["0.1", "10 thz"]}
+{"id": "thz-absorption", "question": "What causes molecular absorption of terahertz signals?", "expected_sources": ["terahertz_communication.md"], "answer_keywords": ["water vapour"]}
+{"id": "thz-photonic", "question": "How are terahertz carriers generated photonically?", "expected_sources": ["terahertz_communication.md"], "answer_keywords": ["two lasers", "photodiode"]}
+{"id": "rram-filament", "question": "What is the conductive filament in an HfO2 RRAM cell made of?", "expected_sources": ["rram_memory.md"], "answer_keywords": ["oxygen vacancies"]}
+{"id": "rram-sneak", "question": "How can sneak-path currents in RRAM crossbar arrays be suppressed?", "expected_sources": ["rram_memory.md"], "answer_keywords": ["selector"]}
+{"id": "rram-ald", "question": "Which deposition method is used for thin HfO2 switching layers?", "expected_sources": ["rram_memory.md"], "answer_keywords": ["atomic layer deposition"]}
+{"id": "litho-image-reversal", "question": "Why is image reversal resist useful for metal lift-off?", "expected_sources": ["photolithography.md"], "answer_keywords": ["undercut"]}
+{"id": "litho-class100", "question": "How many particles does a Class 100 cleanroom allow per cubic foot?", "expected_sources": ["photolithography.md"], "answer_keywords": ["100", "0.5"]}
+{"id": "litho-rayleigh", "question": "Which formula gives the minimum printable feature size in lithography?", "expected_sources": ["photolithography.md"], "answer_keywords": ["rayleigh"]}
+{"id": "rag-rrf", "question": "How does reciprocal rank fusion merge ranked lists?", "expected_sources": ["rag_systems.md"], "answer_keywords": ["1 / (k + rank)"]}
+{"id": "rag-bm25", "question": "Why combine BM25 with dense retrieval?", "expected_sources": ["rag_systems.md"], "answer_keywords": ["exact term"]}
+{"id": "no-worldcup", "question": "Who won the 2018 FIFA World Cup final?", "answerable": false}
+{"id": "no-mercury", "question": "What is the boiling point of mercury in Kelvin?", "answerable": false}
+{"id": "no-gdp", "question": "What was India's GDP growth rate in 2019?", "answerable": false}
+{"id": "no-recipe", "question": "How long should I bake a sourdough loaf?", "answerable": false}
