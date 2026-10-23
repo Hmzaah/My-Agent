@@ -1,6 +1,0 @@
-llama-cpp-python
-sentence-transformers
-faiss-cpu
-numpy
-PyPDF2
-streamlit
