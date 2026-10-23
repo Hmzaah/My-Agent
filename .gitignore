@@ -1,19 +1,24 @@
-# Ignore Agent Memory (Personal Data)
+# Your documents and the indexes built from them stay local
 knowledge_base/
-knowledge_base/*.txt
+data/*
+!data/sample/
+eval/results/
 
-# Ignore Large AI Models
+# Models
 models/
 *.gguf
 
-# Ignore Virtual Environment
+# Secrets
+.env
+
+# Python
 .venv/
 __pycache__/
-
-# Ignore Temporary Install Scripts
-fix_*.py
-write_*.py
-patch_*.py
-tune_*.py
-upgrade_*.py
-unlock_*.py
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+dist/
+build/
